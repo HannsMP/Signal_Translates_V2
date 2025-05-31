@@ -1,5 +1,7 @@
 from utils.render_3d import Render_3d, XYZ
+# cvzone == 1.6.1
 from cvzone.HandTrackingModule import HandDetector
+#numpy == 1.26.2
 import numpy as np
 import json
 import os
@@ -8,7 +10,7 @@ import cv2
 
 class Signal_hands_3d:
 
-    def __init__(self, limit=300, fps=1000, label_name="test"):
+    def __init__(self, limit=300, fps=1000, label_name="test", maxHands=1):
         self.limit = limit
         self.frame_delay = 1000 // fps
 
@@ -17,7 +19,7 @@ class Signal_hands_3d:
         self.file_save = f"../data/{label_name}.json"
 
         self.cap = cv2.VideoCapture(0)
-        self.detector = HandDetector(maxHands=2)
+        self.detector = HandDetector(maxHands=maxHands)
         self.samples = []
 
         self.off_point = [0, 0, 0]
@@ -78,9 +80,6 @@ class Signal_hands_3d:
 
     def render_hands(self, hand_left, hand_rigth):
         self.render.clear()
-
-        print(hand_left)
-        print(hand_rigth)
 
         XYZ.mirror_YZ(hand_left)
         XYZ.mirror_YZ(hand_rigth)
@@ -188,9 +187,10 @@ class Signal_hands_3d:
 
 if (__name__ == "__main__"):
     translate = Signal_hands_3d(
-        limit=300,
-        fps=100,
-        label_name="C"
+        maxHands=1,
+        limit=1000,
+        fps=50,
+        label_name="L"
     )
 
     translate.run()

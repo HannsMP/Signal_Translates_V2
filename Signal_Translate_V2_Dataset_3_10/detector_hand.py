@@ -1,4 +1,5 @@
 from cvzone.HandTrackingModule import HandDetector
+import numpy as np
 import json
 import os
 import cv2
@@ -11,8 +12,8 @@ class Signal_hands:
         self.frame_delay = 1000 // fps
 
         self.label_name = label_name
-        self.mk_check("data")
-        self.file_save = f"data/{label_name}.json"
+        self.mk_check("../data")
+        self.file_save = f"../data/{label_name}.json"
 
         self.cap = cv2.VideoCapture(0)
         self.detector = HandDetector(maxHands=2)
@@ -76,7 +77,7 @@ class Signal_hands:
         if (not hands):
             return img
 
-        if (key == -1):
+        if (key != self.key_s):
             return imgFind
 
         hand_len = len(hands)
@@ -85,14 +86,15 @@ class Signal_hands:
         center_rigth = self.off_point
         absolute = self.off_point
 
-        hand_left = None
-        hand_rigth = None
+        hand_left = self.off_hand
+        hand_rigth = self.off_hand
 
         hand_1 = hands[0]
+
         if (hand_len == 1 or hand_len == 2):
             lm = hand_1["lmList"]
 
-            if (hand_1["type"] == "left"):
+            if (hand_1["type"] == "Left"):
                 center_left = lm[0]
                 hand_left = self.relative_center(lm, center_left)
 
@@ -101,28 +103,29 @@ class Signal_hands:
                 hand_rigth = self.relative_center(lm, center_rigth)
 
         if (hand_len == 2):
+            hand_1 = hands[0]
             hand_2 = hands[1]
             lm = hand_2["lmList"]
 
-            if (hand_2["type"] == "left"):
-                if (not hand_left):
+            if (hand_2["type"] == "Left"):
+                if (hand_1["type"] == "Right"):
                     center_left = lm[0]
                     hand_left = self.relative_center(lm, center_left)
 
             else:
-                if (not hand_rigth):
+                if (hand_1["type"] == "Left"):
                     center_rigth = lm[0]
                     hand_rigth = self.relative_center(lm, center_rigth)
 
-        absolute[0] = center_rigth[0] - center_left[0]
-        absolute[1] = center_rigth[1] - center_left[1]
-        absolute[2] = center_rigth[2] - center_left[2]
+            absolute[0] = center_rigth[0] - center_left[0]
+            absolute[1] = center_rigth[1] - center_left[1]
+            absolute[2] = center_rigth[2] - center_left[2]
 
         if (key == self.key_s):
             self.samples.append({
                 "label_name": self.label_name,
-                "left": hand_left or self.off_hand,
-                "rigth": hand_rigth or self.off_hand,
+                "left": hand_left,
+                "rigth": hand_rigth,
                 "absolute": absolute
             })
 
@@ -150,6 +153,9 @@ class Signal_hands:
             if (key == -1):
                 continue
 
+            elif (key == self.key_c):
+                break
+
             elif (key == self.key_d):
                 self.samples and self.samples.pop()
 
@@ -164,7 +170,7 @@ if (__name__ == "__main__"):
     translate = Signal_hands(
         limit=300,
         fps=100,
-        label_name="C"
+        label_name="A"
     )
 
     translate.run()

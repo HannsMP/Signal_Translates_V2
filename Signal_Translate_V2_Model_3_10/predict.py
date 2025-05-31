@@ -3,6 +3,11 @@ import tensorflow as tf
 import numpy as np
 import os
 import cv2
+import pickle
+
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning)
 
 
 class Signal_hands:
@@ -24,7 +29,10 @@ class Signal_hands:
         self.display_scale = 0.6
         self.display_color = (0, 255, 0)
         self.display_width = 1
-        self.model = tf.keras.models.load_model('../model/model_hands_v1.h5')
+        self.model = tf.keras.models.load_model('../model/v1_model_hands.h5')
+
+        with open('../model/v1_label_encoder.pkl', 'rb') as f:
+            self.label_encoder = pickle.load(f)
 
     def mk_check(self, folder):
         os.makedirs(folder, exist_ok=True)
@@ -103,11 +111,14 @@ class Signal_hands:
             absolute[1] = center_rigth[1] - center_left[1]
             absolute[2] = center_rigth[2] - center_left[2]
 
-        print({
-            "left": hand_left,
-            "rigth": hand_rigth,
-            "absolute": absolute
-        })
+        input_data = np.concatenate([np.array(hand_left).flatten(), np.array(hand_rigth).flatten(), absolute])
+        input_data = np.expand_dims(input_data, axis=0)
+
+        prediction = self.model.predict(input_data, verbose=False)
+        predicted_index = np.argmax(prediction)
+        predicted_label = self.label_encoder.inverse_transform([predicted_index])[0]
+
+        self.display_text = f"Prediccion: {predicted_label}"
 
         return imgFind
 
@@ -119,10 +130,9 @@ class Signal_hands:
             try:
                 if (success):
                     img = self.process(key, img)
-                self.display_text = f"test"
 
             except:
-                self.display_text = f"test"
+                self.display_text = f"esperando..."
 
             self.stamp_display_text(img)
             cv2.imshow("Camara", img)

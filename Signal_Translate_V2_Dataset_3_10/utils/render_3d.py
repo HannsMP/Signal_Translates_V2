@@ -121,6 +121,9 @@ class Render_3d:
         self.window.addItem(item)
         self.items.append(item)
 
+    def setTimeOut(self, fun, time=10):
+        QTimer.singleShot(time, fun)
+
     def hand(self, data, color=(0.99, 0.86, 0.79, 1), size=5, width=10):
         """
         Agrega los puntos y huesos de la mano
