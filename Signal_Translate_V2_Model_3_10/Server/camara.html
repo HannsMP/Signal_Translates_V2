@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Signal Translate</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #ffe09f;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 0;
+        }
+
+        h2 {
+            color: #000000;
+            font-weight: 1000;
+        }
+
+        .conteiner {
+            height: auto;
+            display: flex;
+            flex-direction: row;
+            gap: 20px;
+
+            .content {
+                max-width: 330px;
+                height: auto;
+                display: flex;
+                flex-direction: column;
+
+                gap: 10px;
+
+                img,
+                video,
+                canvas {
+                    width: 320px;
+                    height: 240px;
+                    border: 2px solid #ccc;
+                    border-radius: 10px;
+                    background-color: gray;
+                }
+            }
+
+
+            .controls {
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                gap: 10px;
+                margin-top: 20px;
+
+                button {
+                    padding: 10px 20px;
+                    font-size: 16px;
+                    background-color: #f0f0f0;
+                    border: none;
+                    border-radius: 5px;
+                    color: #000000;
+                    font-weight: bold;
+                    cursor: pointer;
+                    transition: background-color 0.3s ease;
+
+                }
+
+                button:hover {
+                    background-color: #ccc;
+                    cursor: pointer;
+                }
+
+                input[type="number"] {
+                    width: 100px;
+                    padding: 5px;
+                    font-size: 16px;
+                    border: 1px solid #ccc;
+                    border-radius: 5px;
+                }
+
+                p {
+                    width: 320px;
+                    height: auto;
+                    font-size: 16px;
+                    color: #000000;
+                    font-weight: bold;
+                    text-align: left;
+                    margin-top: 10px;
+                    background-color: #f0f0f0;
+                    padding: 10px;
+                    border-radius: 5px;
+                    border: 1px solid #ccc;
+                    overflow: hidden;
+                    white-space: pre-line;
+                    text-overflow: ellipsis;
+                }
+            }
+        }
+
+        @media (max-width: 768px) {
+            .conteiner {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .content img,
+            .content video,
+            .content canvas,
+            .controls p {
+                width: 100%;
+                max-width: 320px;
+                height: auto;
+            }
+
+            .controls input[type="number"] {
+                width: 80px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <h2>TRADUCTOR DE LENGUAJE DE SEÑAS</h2>
+    <div class="conteiner">
+        <div class="content">
+            <video id="videoRes" autoplay></video>
+            <canvas id="videoCanvas" style="display: none"></canvas>
+            <img id="imgPipe">
+        </div>
+        <div class="controls">
+            <label for="intervalInput">INTERVALOS (ms): </label>
+            <input type="number" id="intervalInput" value="100">
+            <button id="startBtn">Start</button>
+            <button id="stopBtn" style="display: none;">Stop</button>
+            <p id="textPredictor">...</p>
+            <button id="textClear">Limpiar entradas</button>
+        </div>
+    </div>
+    <script>
+        class CameraCapture {
+
+            #videoElement
+            #canvasElement
+            #imgPipeElement
+            #intervalInput
+            #context
+            #width
+            #height
+            #intervalId
+            #textPredictor
+            #lastLetter = "";
+            #concatenate = "";
+
+            #sendFrame(imageData) {
+                fetch('/process_frame', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ image: imageData })
+                })
+                    .then(res => res.json())
+                    .then(json => {
+                        let { image, hasHand, letter } = json;
+                        this.#imgPipeElement.src = image;
+                        if (this.#lastLetter !== letter) {
+                            if (hasHand) {
+                                this.#concatenate += letter;
+                                this.#lastLetter = letter;
+                            }
+                            else {
+                                this.#concatenate += " ";
+                                this.#lastLetter = " ";
+                            }
+                        }
+
+                        let value = this.#concatenate.trim()
+                        if (value !== this.#textPredictor.innerText)
+                            this.#textPredictor.innerText = value;
+                    });
+            }
+
+            /**
+             * @param {HTMLVideoElement} videoElement
+             * @param {HTMLCanvasElement} canvasElement
+             * @param {HTMLImageElement} imgPipeElement
+             * @param {HTMLInputElement} intervalInput
+             * @param {HTMLParagraphElement} textPredictor
+             */
+            constructor(videoElement, canvasElement, imgPipeElement, intervalInput, textPredictor) {
+                this.#videoElement = videoElement;
+                this.#canvasElement = canvasElement;
+                this.#imgPipeElement = imgPipeElement;
+                this.#intervalInput = intervalInput;
+                this.#textPredictor = textPredictor;
+
+                /** @type {CanvasRenderingContext2D} */
+                this.#context = this.#canvasElement.getContext('2d');
+
+                this.updateSize(640, 480);
+
+                this.#intervalId = null;
+
+            }
+
+            async setupCamera() {
+                try {
+                    let stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                    this.#videoElement.srcObject = stream;
+
+                } catch (error) {
+                    console.error('Error accessing the camera: ', error);
+                    alert('Error al detectar una cámara. Consulte sus permisos.');
+                    window.location.href = window.location.href;
+                }
+            }
+
+            startCapture() {
+                if (this.#intervalId)
+                    this.stopCapture(this.#intervalId);
+
+                let intervalTime = Math.floor(+this.#intervalInput.value);
+
+                this.#intervalId = setInterval(() => {
+                    this.#context.drawImage(this.#videoElement, 0, 0, this.#width, this.#height);
+                    let imageData = this.#canvasElement.toDataURL('image/jpeg');
+
+                    this.#sendFrame(imageData);
+                }, intervalTime);
+            }
+
+            stopCapture() {
+                clearInterval(this.#intervalId);
+                this.#intervalId = null;
+            }
+
+            updateSize(width, height) {
+                this.#width = this.#videoElement.width = this.#canvasElement.width = this.#imgPipeElement.width = width;
+                this.#height = this.#videoElement.height = this.#canvasElement.height = this.#imgPipeElement.height = height;
+
+                this.#videoElement.style.width = Math.floor(width / 2) + "px";
+                this.#videoElement.style.height = Math.floor(height / 2) + "px";
+                this.#canvasElement.style.width = Math.floor(width / 2) + "px";
+                this.#canvasElement.style.height = Math.floor(height / 2) + "px";
+                this.#imgPipeElement.style.width = Math.floor(width / 2) + "px";
+                this.#imgPipeElement.style.height = Math.floor(height / 2) + "px";
+            }
+
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            let videoRes = document.getElementById('videoRes');
+            let canvas = document.getElementById('videoCanvas');
+            let imgPipe = document.getElementById('imgPipe');
+            let intervalInput = document.getElementById('intervalInput');
+            let textPredictor = document.getElementById('textPredictor');
+            let textClear = document.getElementById('textClear');
+
+            textClear.addEventListener('click', () => {
+                textPredictor.innerText = "...";
+            });
+
+            let startBtn = document.getElementById('startBtn');
+            let stopBtn = document.getElementById('stopBtn');
+
+            // Cargar el intervalo guardado
+            intervalInput.value = localStorage.getItem('interval') || 100;
+
+            // crea una instancia de CameraCapture
+            let cameraCapture = new CameraCapture(videoRes, canvas, imgPipe, intervalInput, textPredictor);
+
+            // configura la cámara
+            cameraCapture.setupCamera();
+
+            // comienza la captura de video
+            startBtn.addEventListener('click', () => {
+                cameraCapture.startCapture();
+                stopBtn.style.display = 'block';
+                startBtn.style.display = 'none';
+            });
+
+            // detiene la captura de video
+            stopBtn.addEventListener('click', () => {
+                cameraCapture.stopCapture();
+                startBtn.style.display = 'block';
+                stopBtn.style.display = 'none';
+            });
+
+            // Cambia el intervalo de captura
+            intervalInput.addEventListener('input', () => {
+                localStorage.setItem('interval', intervalInput.value);
+                cameraCapture.stopCapture();
+                cameraCapture.startCapture();
+            });
+
+            let adjustOrientation = () => {
+                const isLandscape = window.innerWidth > window.innerHeight;
+                const width = isLandscape ? 640 : 320;
+                const height = isLandscape ? 480 : 240;
+                cameraCapture.updateSize(width, height);
+            }
+
+            window.addEventListener("orientationchange", () => {
+                setTimeout(adjustOrientation, 300);
+            });
+
+            window.addEventListener("resize", adjustOrientation);
+        });
+    </script>
+</body>
+
+</html>

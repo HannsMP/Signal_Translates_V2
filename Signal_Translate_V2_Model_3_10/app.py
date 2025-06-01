@@ -1,0 +1,130 @@
+from flask import Flask, request, jsonify, render_template
+import tensorflow as tf
+import numpy as np
+import cv2
+import os
+import pickle
+import base64
+import logging
+
+from cvzone.HandTrackingModule import HandDetector
+
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+
+app = Flask(__name__, template_folder='Server/')
+
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
+
+class Signal_hands:
+    def __init__(self, maxHands=1):
+        self.detector = HandDetector(maxHands=maxHands)
+
+        self.off_point = [0, 0, 0]
+        self.off_hand = [self.off_point[:] for _ in range(21)]
+
+        self.model = tf.keras.models.load_model('../model/v1_model_hands.h5')
+        with open('../model/v1_label_encoder.pkl', 'rb') as f:
+            self.label_encoder = pickle.load(f)
+
+    def relative_center(self, lmList, center):
+        c0, c1, c2 = center
+        return [[p[0] - c0, p[1] - c1, p[2] - c2] for p in lmList]
+
+    def predict_from_image(self, img):
+        hands, _ = self.detector.findHands(img, draw=False)
+
+        if not hands:
+            return img, False, "fuera de rango"
+
+        hand_len = len(hands)
+
+        center_left = self.off_point
+        center_rigth = self.off_point
+        absolute = self.off_point
+
+        hand_left = self.off_hand
+        hand_rigth = self.off_hand
+
+        hand_1 = hands[0]
+
+        if hand_len == 1 or hand_len == 2:
+            lm = hand_1["lmList"]
+
+            if hand_1["type"] == "Left":
+                center_left = lm[0]
+                hand_left = self.relative_center(lm, center_left)
+            else:
+                center_rigth = lm[0]
+                hand_rigth = self.relative_center(lm, center_rigth)
+
+        if hand_len == 2:
+            hand_2 = hands[1]
+            lm = hand_2["lmList"]
+
+            if hand_2["type"] == "Left" and hand_1["type"] == "Right":
+                center_left = lm[0]
+                hand_left = self.relative_center(lm, center_left)
+            elif hand_2["type"] == "Right" and hand_1["type"] == "Left":
+                center_rigth = lm[0]
+                hand_rigth = self.relative_center(lm, center_rigth)
+
+            absolute = [
+                center_rigth[0] - center_left[0],
+                center_rigth[1] - center_left[1],
+                center_rigth[2] - center_left[2],
+            ]
+
+        input_data = np.concatenate([
+            np.array(hand_left).flatten(),
+            np.array(hand_rigth).flatten(),
+            absolute
+        ])
+        input_data = np.expand_dims(input_data, axis=0)
+
+        prediction = self.model.predict(input_data, verbose=False)
+        predicted_index = np.argmax(prediction)
+        predicted_label = self.label_encoder.inverse_transform([predicted_index])[0]
+
+        return img, True, predicted_label
+
+
+# Instancia del modelo de predicción
+translator = Signal_hands(maxHands=2)
+
+@app.route('/')
+def index():
+    return render_template('camara.html')
+
+@app.route('/process_frame', methods=['POST'])
+def process_frame():
+    try:
+        data = request.json['image']
+        image_data = base64.b64decode(data.split(',')[1])
+        np_arr = np.frombuffer(image_data, np.uint8)
+        img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+
+        img_out, has_hand, label = translator.predict_from_image(img)
+
+        # Mostrar resultado en imagen
+        if has_hand:
+            cv2.putText(img_out, label, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 2)
+
+        _, buffer = cv2.imencode('.jpg', img_out)
+        img_base64 = base64.b64encode(buffer).decode('utf-8')
+        img_base64 = 'data:image/jpeg;base64,' + img_base64
+
+        return jsonify({
+            'image': img_base64,
+            'hasHand': has_hand,
+            'letter': label
+        })
+
+    except Exception as e:
+        print("Error:", str(e))
+        return jsonify({'error': 'Error al procesar la imagen'})
+
+if __name__ == '__main__':
+    print("Servidor corriendo en http://127.0.0.1:5000")
+    app.run(debug=True)
