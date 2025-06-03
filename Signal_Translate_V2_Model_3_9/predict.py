@@ -1,17 +1,9 @@
-# TensorFlow == 2.19.0
-import tensorflow as tf
-# numpy == 1.26.2
-import numpy as np
-# opencv-python == 4.11.0.86
-# opencv-contrib-python == 4.11.0.86
-# mediapipe == 0.10.14
-# keras == 3.9.2
-import cv2
-import os
-import pickle
-
-# cvzone == 1.6.1
 from cvzone.HandTrackingModule import HandDetector
+import tensorflow as tf
+import numpy as np
+import os
+import cv2
+import pickle
 
 import warnings
 
