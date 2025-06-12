@@ -1,48 +1,41 @@
 from cvzone.HandTrackingModule import HandDetector
+import tensorflow as tf
 import numpy as np
-import json
 import os
 import cv2
+import pickle
+
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning)
 
 
 class Signal_hands:
 
-    def __init__(self, limit=300, fps=1000, label_name="test"):
-        self.limit = limit
+    def __init__(self, fps=1000, maxHands=1):
         self.frame_delay = 1000 // fps
 
-        self.label_name = label_name
-        self.mk_check("../data")
-        self.file_save = f"../data/{label_name}.json"
-
         self.cap = cv2.VideoCapture(0)
-        self.detector = HandDetector(maxHands=2)
-        self.samples = []
+        self.detector = HandDetector(maxHands=maxHands)
 
         self.off_point = [0, 0, 0]
         self.off_hand = [self.off_point[:] for _ in range(21)]
 
-        # guardar
-        self.key_s = ord("s")
         # cerrar
         self.key_c = ord("c")
-        # retirar el ultimo
-        self.key_d = ord("d")
-        # vaciar muestras
-        self.key_v = ord("v")
 
         self.display_text = "fuera de rango"
         self.display_font = cv2.FONT_HERSHEY_SIMPLEX
         self.display_scale = 0.6
         self.display_color = (0, 255, 0)
         self.display_width = 1
+        self.model = tf.keras.models.load_model('../model/v1_model_hands.h5')
+
+        with open('../model/v1_label_encoder.pkl', 'rb') as f:
+            self.label_encoder = pickle.load(f)
 
     def mk_check(self, folder):
         os.makedirs(folder, exist_ok=True)
-
-    def save_json(self):
-        with open(self.file_save, "w") as f:
-            json.dump(self.samples, f)
 
     def read_cap(self):
         return self.cap.read()
@@ -76,9 +69,6 @@ class Signal_hands:
 
         if (not hands):
             return img
-
-        if (key != self.key_s):
-            return imgFind
 
         hand_len = len(hands)
 
@@ -121,13 +111,14 @@ class Signal_hands:
             absolute[1] = center_rigth[1] - center_left[1]
             absolute[2] = center_rigth[2] - center_left[2]
 
-        if (key == self.key_s):
-            self.samples.append({
-                "label_name": self.label_name,
-                "left": hand_left,
-                "rigth": hand_rigth,
-                "absolute": absolute
-            })
+        input_data = np.concatenate([np.array(hand_left).flatten(), np.array(hand_rigth).flatten(), absolute])
+        input_data = np.expand_dims(input_data, axis=0)
+
+        prediction = self.model.predict(input_data, verbose=False)
+        predicted_index = np.argmax(prediction)
+        predicted_label = self.label_encoder.inverse_transform([predicted_index])[0]
+
+        self.display_text = f"Prediccion: {predicted_label}"
 
         return imgFind
 
@@ -139,16 +130,12 @@ class Signal_hands:
             try:
                 if (success):
                     img = self.process(key, img)
-                self.display_text = f"'{self.label_name}': [{len(self.samples)}/{self.limit}]"
 
             except:
-                self.display_text = f"'{self.label_name}': [{len(self.samples)}/{self.limit}] Error de procesamiento"
+                self.display_text = f"esperando..."
 
             self.stamp_display_text(img)
             cv2.imshow("Camara", img)
-
-            if (len(self.samples) >= self.limit):
-                break
 
             if (key == -1):
                 continue
@@ -156,21 +143,13 @@ class Signal_hands:
             elif (key == self.key_c):
                 break
 
-            elif (key == self.key_d):
-                self.samples and self.samples.pop()
-
-            elif (key == self.key_v):
-                self.samples.clear()
-
-        self.save_json()
         self.end_cap()
 
 
 if (__name__ == "__main__"):
     translate = Signal_hands(
-        limit=300,
-        fps=100,
-        label_name="A"
+        maxHands=1,
+        fps=50,
     )
 
     translate.run()
