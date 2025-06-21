@@ -73,7 +73,7 @@ class Signal_hands:
         )
 
     def process(self, key, img):
-        hands, imgFind = self.detector.findHands(img)
+        hands, imgFind = self.detector.findHands(img, draw=False)
 
         if (not hands):
             return img
