@@ -188,8 +188,8 @@ class Signal_hands_3d:
 if (__name__ == "__main__"):
     translate = Signal_hands_3d(
         maxHands=1,
-        limit=1000,
-        fps=50,
+        limit=3000,
+        fps=30,
         label_name="L"
     )
 

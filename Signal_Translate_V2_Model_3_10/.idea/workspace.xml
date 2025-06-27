@@ -5,8 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="d22a2b3d-9e72-4e97-ba6b-611eaf13fc5f" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/../Signal_Translate_V2_Dataset_3_10/detector_hand.py" beforeDir="false" afterPath="$PROJECT_DIR$/../Signal_Translate_V2_Dataset_3_10/detector_hand.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Signal_Translate_V2_Dataset_3_10/detector_hand_3d.py" beforeDir="false" afterPath="$PROJECT_DIR$/../Signal_Translate_V2_Dataset_3_10/detector_hand_3d.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/predict.py" beforeDir="false" afterPath="$PROJECT_DIR$/predict.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../data/A.json" beforeDir="false" afterPath="$PROJECT_DIR$/../data/A.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../data/B.json" beforeDir="false" afterPath="$PROJECT_DIR$/../data/B.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

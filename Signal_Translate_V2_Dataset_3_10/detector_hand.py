@@ -1,4 +1,7 @@
+from utils.render_3d import Render_3d, XYZ
+# cvzone == 1.6.1
 from cvzone.HandTrackingModule import HandDetector
+#numpy == 1.26.2
 import numpy as np
 import json
 import os
@@ -34,7 +37,7 @@ class Signal_hands:
         self.display_text = "fuera de rango"
         self.display_font = cv2.FONT_HERSHEY_SIMPLEX
         self.display_scale = 0.6
-        self.display_color = (0, 255, 0)
+        self.display_color = (255, 0, 0)
         self.display_width = 1
 
     def mk_check(self, folder):
@@ -168,9 +171,9 @@ class Signal_hands:
 
 if (__name__ == "__main__"):
     translate = Signal_hands(
-        limit=300,
-        fps=100,
-        label_name="A"
+        limit=3000,
+        fps=30,
+        label_name="casa"
     )
 
     translate.run()
